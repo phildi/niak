@@ -99,7 +99,8 @@ else
     %% Grab the results from the NIAK fMRI preprocessing pipeline
     opt_g.min_nb_vol = 30; % the demo dataset is very short, so we have to lower considerably the minimum acceptable number of volumes per run 
     opt_g.type_files = 'roi'; % Specify to the grabber to prepare the files for the region growing pipeline
-    files_in.fmri = niak_grab_fmri_preprocess(path_demo,opt_g).fmri; % Replace the folder by the path where the results of the fMRI preprocessing pipeline were stored. 
+    path_tmp = niak_grab_fmri_preprocess(path_demo,opt_g)
+    files_in.fmri = path_tmp.fmri; % Replace the folder by the path where the results of the fMRI preprocessing pipeline were stored. 
 end
 
 %% Set the seeds
