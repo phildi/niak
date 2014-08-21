@@ -5,47 +5,38 @@ function [in,out,opt] = niak_brick_table_clusters(in,out,opt)
 % [IN,OUT,OPT] = NIAK_BRICK_TABLE_CLUSTERS(IN,OUT,OPT)
 %
 % INPUTS:
-%    IN.PART (string) a file name of a 3D partition (cluster I filled with Is).
-%    IN.LABELS_PART (string) a fil
+%   IN.PART (string) a file name of a 3D partition (cluster I filled with Is).
+%       Note that the cluster numerical values do not need to be 1, ... , N.
+%       The background is filled with 0s.
+%   IN.LABELS_PART (string, default 'clusterI') a .csv file name where row I 
+%      has a (string) label for network I. The .csv can also have two columns, 
+%      in which case the second column is used to specify the numerical label of 
+%      the cluster.
+%   IN.REF (string, default the AAL NIAK template) a file name of a 3D 
+%      partition used as a reference to label the clusters. Note that the cluster
+%      numerical values do not need to be 1, ... , N. The background is filled with 0s.
+%   IN.LABELS_REF (string, necessary if REF is not the default, otherwise 
+%      uses the AAL labels) same as LABELS_PART, but for REF.
 %
-% OUT
-%   (structure) with the following fields:
-%       
-%   CORRECTED_DATA
-%       (string, default <BASE NAME FMRI>_c.<EXT>) File name for processed 
-%       data.
-%       If OUT is an empty string, the name of the outputs will be 
-%       the same as the inputs, with a '_c' suffix added at the end.
+% OUT (string) a .csv with a sumary table. Each row corresponds to a cluster:
+%      column 1: string label (in IN.LABELS_PART)
+%      column 2: numerical label (in IN.PART)
+%      column 3: the volume (in mm3)
+%      column 4: the label of the reference cluster with highest overlap with 
+%         the cluster.
+%      column 5: the percentage of overlap of the reference cluster inside the 
+%         target cluster.
+%      column 6: the percentage of overlap of the target clusters inside the 
+%         reference cluster.
+%      Each block of three sbsequent columns code for the second-most reference 
+%      cluster with highest overlap, third-most reference cluster, etc. 
+%      The max number of clusters can be set in OPT
 %
-%   MASK
-%       (string, default <BASE NAME FMRI>_mask.<EXT>) File name for a mask 
-%       of the data. If OUT is an empty string, the name of the 
-%       outputs will be the same as the inputs, with a '_mask' suffix added 
-%       at the end.
-%
-% OPT           
-%   (structure) with the following fields.  
-%
-%   TYPE_CORRECTION       
-%      (string, default 'mean_var') possible values :
-%      'none' : no correction at all                       
-%      'mean' : correction to zero mean.
-%      'mean_var' : correction to zero mean and unit variance
-%      'mean_var2' : same as 'mean_var' but slower, yet does not use as 
-%      much memory).
-%
-%   FOLDER_OUT 
-%      (string, default: path of IN) If present, all default outputs 
-%      will be created in the folder FOLDER_OUT. The folder needs to be 
-%      created beforehand.
-%
-%   FLAG_VERBOSE 
-%      (boolean, default 1) if the flag is 1, then the function prints 
-%      some infos during the processing.
-%
-%   FLAG_TEST 
-%      (boolean, default 0) if FLAG_TEST equals 1, the brick does not do 
-%      anything but update the default values in IN, OUT and OPT.
+% OPT.NB_REF (integer, default 5) the max number of reference clusters being listed. 
+% OPT.FLAG_VERBOSE (boolean, default 1) if the flag is 1, then the function prints 
+%   some infos during the processing.
+% OPT.FLAG_TEST (boolean, default 0) if FLAG_TEST equals 1, the brick does not do 
+%   anything but update the default values in IN, OUT and OPT.
 %           
 % _________________________________________________________________________
 % OUTPUTS:
@@ -53,27 +44,24 @@ function [in,out,opt] = niak_brick_table_clusters(in,out,opt)
 % IN, OUT, OPT: same as inputs but updated with default values.
 %              
 % _________________________________________________________________________
-% SEE ALSO:
-% NIAK_CORRECT_MEAN_VAR
-%
-% _________________________________________________________________________
 % COMMENTS:
 %
-% That code is just to demonstrate the guidelines for NIAK bricks. It is
-% also a good idea to start a new command project by editing this file and
-% saving it under the new command name.
-%
-% Note that this function is actually a fully functional brick to perform a
-% temporal normalization on fMRI time series (correction of mean, variance,
-% etc). That brick is pretty much useless, because it is just as simple to
-% apply NIAK_CORRECT_MEAN_VARIANCE "on-the-fly" in other bricks. It is 
-% still a good brick example.
-%
+% The target and reference partitions need to be in the same space, and sampled
+% on the same grid !
+% 
+% An example of a label file would look like:
+% Precentral_L  , 2001
+% Precentral_R  , 2002
+% Frontal_Sup_L , 2101
+% etc 
 % _________________________________________________________________________
-% Copyright (c) <NAME>, <INSTITUTION>, <START DATE>-<END DATE>.
-% Maintainer : <EMAIL ADDRESS>
+% Copyright (c) Pierre Bellec
+% Centre de recherche de l'institut de gériatrie de Montréal, 
+% Department of Computer Science and Operations Research
+% University of Montreal, Québec, Canada, 2010-2014
 % See licensing information in the code.
-% Keywords : NIAK, documentation, template, brick
+% Maintainer : pierre.bellec@criugm.qc.ca
+% Keywords : NIAK, table, clusters
 
 % Permission is hereby granted, free of charge, to any person obtaining a copy
 % of this software and associated documentation files (the "Software"), to deal
@@ -94,110 +82,80 @@ function [in,out,opt] = niak_brick_table_clusters(in,out,opt)
 % THE SOFTWARE.
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Initialization and syntax checks %%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%% global NIAK variables
+%% Initialization and syntax checks
 flag_gb_niak_fast_gb = true; % Only load the most important global variables for fast initialization
 niak_gb_vars 
 
 %% Syntax
-if ~exist('in','var')||~exist('out','var')||~exist('opt','var')
+if ~exist('in','var')||~exist('out','var')
     error('niak:brick','Bad syntax, type ''help %s'' for more info.',mfilename)
 end
 
-%% Inputs
-if ~ischar(in)
-    error('IN should be a string');
+if nargin < 3
+    opt = struct;
 end
-    
+
+%% Input files
+in = psom_struct_defaults( in , ...
+      {'part' , 'labels_part' , 'ref' , 'labels_ref' }, ...
+      {NaN    , ''            , ''    , ''           });
+
+if ~isempty(in.ref)&&isempty(in.labels_ref)
+    error('Please specify FILES_IN.LABELS_REF to use FILES_IN.REF');
+end
+
+if isempty(in.ref)
+    in.ref = [gb_niak_path_niak 'template' filesep 'roi_aal_3mm.mnc.gz'];
+    in.labels_ref = [gb_niak_path_niak 'template' filesep 'labels_aal.csv'];
+end
+
+%% Output file
+if ~ischar(out)
+    error('FILES_OUT should be a string')
+end
+
 %% Options
-gb_name_structure = 'opt';
-gb_list_fields    = {'type_correction' , 'flag_verbose' , 'flag_test' , 'folder_out' };
-gb_list_defaults  = {'mean_var'        , true           , false       , ''           };
-niak_set_defaults
-
-
-%% Check the output files structure
-gb_name_structure = 'out';
-gb_list_fields    = {'corrected_data'  , 'mask'            };
-gb_list_defaults  = {'gb_niak_omitted' , 'gb_niak_omitted' };
-niak_set_defaults
-
-%% Building default output names
-[path_f,name_f,ext_f] = niak_fileparts(in(1,:)); % parse the folder, file name and extension of the input
-
-if strcmp(opt.folder_out,'') % if the output folder is left empty, use the same folder as the input
-    opt.folder_out = path_f;
-    folder_out = path_f;
-end
-
-if isempty(out.corrected_data)
-
-    if size(in,1) == 1 % There is only one input volume
-
-        out.corrected_data = cat(2,opt.folder_out,filesep,name_f,'_c',ext_f);
-
-    else % Multiple volumes have been specified, must be an old analyze format
-
-        name_files = cell([size(in,1) 1]);
-
-        for num_f = 1:size(in,1)
-            [path_f,name_f,ext_f] = fileparts(deblank(in(num_f,:)));
-
-            if strcmp(ext_f,'.gz')
-                [tmp,name_f,ext_f] = fileparts(name_f);
-            end
-            
-            name_files{num_f} = cat(2,opt.folder_out,filesep,name_f,'_c',ext_f);
-        end
-        out = char(name_filtered_data);
-    end
-end
-
-if isempty(out.mask)
-
-    out.mask = cat(2,opt.folder_out,filesep,name_f,'_mask',ext_f);
-
-end
+opt = psom_struct_defaults( opt , ...
+      {'nb_ref' , 'flag_verbose' , 'flag_test' }, ...
+      {5        , true           , false       });
 
 %% If the test flag is true, stop here !
-if flag_test == 1
+if opt.flag_test == 1
     return
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% The core of the brick starts here %%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% The core of the brick starts here
 
-if flag_verbose
-    msg = sprintf('Performing temporal correction of %s on the fMRI time series in file %s',type_correction,in);
-    stars = repmat('*',[length(msg) 1]);
-    fprintf('\n%s\n%s\n%s\n',stars,msg,stars);
+%% Read the target partition
+[hdr,part] = niak_read_vol(in.part);
+labels_part = niak_read_csv_cell(in.labels_part);
+ind_part = unique(part(:));
+ind_part = ind_part(ind_part~=0);
+nb_part = length(ind_part);
+if size(labels_part,2)>1
+    [val,s_idx] = ismember(ind_part,labels_part(:,2));
+    if any(~val)
+        error('Some numerical labels in IN.PART could not be found in the second column of IN.LABELS_PART')
+    end
+    labels_part = labels_part(s_idx,1);
+end
+    
+%% Read the reference partition
+[hdr2,ref] = niak_read_vol(in.ref);
+if any(size(part)~=size(ref))
+    error('It looks like the target and reference clusters are not in the same space')
+end
+ind_ref = unique(ref(:));
+ind_ref = ind_ref(ind_ref~=0);
+nb_ref = length(ind_ref);
+if size(labels_ref,2)>1
+    [val,s_idx] = ismember(ind_ref,labels_ref(:,2));
+    if any(~val)
+        error('Some numerical labels in IN.PART could not be found in the second column of IN.LABELS_PART')
+    end
+    labels_ref = labels_ref(s_idx,1);
 end
 
-%% Correct the time series 
-if flag_verbose
-    fprintf('Correct the time series ...\n');
-end
-[hdr,vol] = niak_read_vol(in); % read fMRI data
-mask = niak_mask_brain(mean(abs(vol),4)); % extract a brain mask
-tseries = niak_vol2tseries(vol,mask); % extract the time series in the mask
-tseries = niak_correct_mean_var(tseries,type_correction); % Correct the time series
-vol = niak_tseries2vol(tseries,mask);
+%% now make the table
+tab = cell(nb_part+1,3+3*opt.nb_ref);
 
-%% Save outputs
-if flag_verbose
-    fprintf('Save outputs ...\n');
-end
-
-if ~strcmp(out.corrected_data,'gb_niak_omitted');
-    hdr.file_name = out.corrected_data;
-    niak_write_vol(hdr,vol);
-end
-
-if ~strcmp(out.mask,'gb_niak_omitted');
-    hdr.file_name = out.mask;
-    niak_write_vol(hdr,mask);
-end
