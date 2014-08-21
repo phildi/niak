@@ -4,34 +4,93 @@ function [] = niak_schemaball(data,mask,opt)
 % 
 % INPUTS:
 %   DATA (2D array n*n) a symmetric correlation matrix
-%   MASK (2D array n*n) a symmetric correlation matrix, with some connections set to zero
+%   MASK (2D array n*n, default DATA) a symmetric correlation matrix, 
+%       with some connections set to zero. The actual values do not matter, just the zeros.
 %   OPT.NAMES (cell array n*1, default {'1',...,'n'})
 %   OPT.EDGES (string, default 'Bezier') type of lines between nodes. 
 %      Available options: 'Bezier' (curved lines), 'Line' (straight lines). 
 %   OPT.CONNECT (string, default 'Thickness') type of representation of connection strength
 %      Available options: 'Thickness' (change thickness), 'Colour' (change colour)
-%   OPT.REORDER (boolean, default true) if the flag is on, reorder data to minimize edge 
-%      crossings (bandwidth)
+%   OPT.FLAG_REORDER (boolean, default true) if the flag is on, reorder data to minimize 
+%      edge crossings (bandwidth)
 %   OPT.FLAG_EXTRA (boolean, default true) if the flag is on, make extra plots
 %
 % EXAMPLE:
-% Data = zeros(8,8); Data(find(eye(8))) = 1;
-% Data(1,5) = 0.9; Data(2,6) = 0.8; Data(3,7) = 0.9; % interhemispheric +connections
-% Data(1,2) = 0.6; Data(1,3) = 0.6; Data(1,4) = 0.5 % connection ROI1 to others
-% Data(5,6) = -0.6; Data(5,7) = -0.6; Data(5,8) = -0.5
-% Data = triu(Data).'+triu(Data,1); % = symmetric 
-% Mask = Data; 
-% opt.names   = { 'Left ROI1'  , 'Left ROI2'  , 'Left ROI3'  , 'Left ROI4' , ...
-%                 'Right ROI1' , 'Right ROI2' , 'Right ROI3' , 'Right ROI4' };
-% opt.edges   = 'Bezier';
-% opt.connect = 'colour';
-% opt.reorder = false;
-% opt.extra   = true;
-% niak_schemaball(Data,Mask,opt)
+%   Data = zeros(8,8); Data(find(eye(8))) = 1;
+%   Data(1,5) = 0.9; Data(2,6) = 0.8; Data(3,7) = 0.9; % interhemispheric +connections
+%   Data(1,2) = 0.6; Data(1,3) = 0.6; Data(1,4) = 0.5 % connection ROI1 to others
+%   Data(5,6) = -0.6; Data(5,7) = -0.6; Data(5,8) = -0.5
+%   Data = triu(Data).'+triu(Data,1); % = symmetric 
+%   Mask = Data; 
+%   opt.names   = { 'Left ROI1'  , 'Left ROI2'  , 'Left ROI3'  , 'Left ROI4' , ...
+%                   'Right ROI1' , 'Right ROI2' , 'Right ROI3' , 'Right ROI4' };
+%   opt.edges   = 'Bezier';
+%   opt.connect = 'Colour';
+%   opt.flag_reorder = false;
+%   opt.flag_extra   = true;
+%   niak_schemaball(Data,Mask,opt)
+%
+% COMMENTS:
+% Only the connections that are not set to zero in MASK are represented. 
+%
+% The main code is the subfunction "schemaball.m" by Cyril Pernet 13 June 2014
+% Copied and "niakified" on 2014/08/21 by P. Bellec from
+%    https://github.com/CPernet/various_matlab_functions/blob/master/schemaball.m
+% This version of schemaball is a hack of functions from
+% Gunther Struyf https://github.com/GuntherStruyf/matlab-tools/blob/master/schemaball.m
+% Oleg Komarov http://www.mathworks.co.uk/matlabcentral/fileexchange/42279-schemaball
+% See licensing information in the code.
+%
+% KEYWORDS:
+% visualization, graph
 
-function schemaball(Data,Mask,varargin)
+% Permission is hereby granted, free of charge, to any person obtaining a copy
+% of this software and associated documentation files (the "Software"), to deal
+% in the Software without restriction, including without limitation the rights
+% to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+% copies of the Software, and to permit persons to whom the Software is
+% furnished to do so, subject to the following conditions:
+%
+% The above copyright notice and this permission notice shall be included in
+% all copies or substantial portions of the Software.
+%
+% THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+% IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+% FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+% AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+% LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+% THE SOFTWARE.
 
-% FORMAT schemaball( Data , Mask , [Names,'Threshold',x,'Reorder','Yes',ExtraPlots,'Yes'] )
+if nargin < 2
+    mask = data;
+end
+
+if nargin < 3
+    opt = struct;
+end
+
+opt = psom_struct_defaults( opt, ...
+                            { 'names' , 'edges'  , 'connect'   , 'flag_reorder' , 'flag_extra' } , ...
+                            { {}      , 'Bezier' , 'Thickness' , true           , true         }); 
+
+if opt.flag_reorder
+    reorder = 'Yes';
+else
+    reorder = 'No';
+end
+
+if opt.flag_extra
+    extra = 'Yes';
+else
+    extra = 'No';
+end
+
+sub_schemaball(data,mask,'Names',opt.names,'Edges',opt.edges,'Connect',opt.connect,'Reorder',reorder,'ExtraPlots',extra);
+
+function sub_schemaball(Data,Mask,varargin)
+
+% FORMAT schemaball( Data , Mask , [Names,{'1',...,'n'}] , ['Edges','Bezier'] , ['Connect','Thickness'] , ['Reorder','Yes'] , [ExtraPlots,'Yes'] )
 % 
 % INPUT Data is a 2D n*n symmetric correlation matrix
 %       Mask is a 2D n*n binary matrix. 1s indicate which connections to plot.
