@@ -33,7 +33,7 @@ function schemaball(Data,Mask,varargin)
 
 % FORMAT schemaball( Data , Mask , [Names,'Threshold',x,'Reorder','Yes',ExtraPlots,'Yes'] )
 % 
-% IMPUT Data is a 2D n*n symmetric correlation matrix
+% INPUT Data is a 2D n*n symmetric correlation matrix
 %       Mask is a 2D n*n binary matrix. 1s indicate which connections to plot.
 %   OPTIONS ARE
 %       Names      cell array with n names (default 1 to n)
