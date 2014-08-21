@@ -1,25 +1,50 @@
+function [] = niak_schemaball(data,mask,opt)
+% Make a "ball" schematic representation of a correlation matrix
+% SYNTAX: [] = NIAK_SCHEMABALL(DATA,MASK,OPT)
+% 
+% INPUTS:
+%   DATA (2D array n*n) a symmetric correlation matrix
+%   MASK (2D array n*n) a symmetric correlation matrix, with some connections set to zero
+%   OPT.NAMES (cell array n*1, default {'1',...,'n'})
+%   OPT.EDGES (string, default 'Bezier') type of lines between nodes. 
+%      Available options: 'Bezier' (curved lines), 'Line' (straight lines). 
+%   OPT.CONNECT (string, default 'Thickness') type of representation of connection strength
+%      Available options: 'Thickness' (change thickness), 'Colour' (change colour)
+%   OPT.REORDER (boolean, default true) if the flag is on, reorder data to minimize edge 
+%      crossings (bandwidth)
+%   OPT.FLAG_EXTRA (boolean, default true) if the flag is on, make extra plots
+%
+% EXAMPLE:
+% Data = zeros(8,8); Data(find(eye(8))) = 1;
+% Data(1,5) = 0.9; Data(2,6) = 0.8; Data(3,7) = 0.9; % interhemispheric +connections
+% Data(1,2) = 0.6; Data(1,3) = 0.6; Data(1,4) = 0.5 % connection ROI1 to others
+% Data(5,6) = -0.6; Data(5,7) = -0.6; Data(5,8) = -0.5
+% Data = triu(Data).'+triu(Data,1); % = symmetric 
+% Mask = Data; 
+% opt.names   = { 'Left ROI1'  , 'Left ROI2'  , 'Left ROI3'  , 'Left ROI4' , ...
+%                 'Right ROI1' , 'Right ROI2' , 'Right ROI3' , 'Right ROI4' };
+% opt.edges   = 'Bezier';
+% opt.connect = 'colour';
+% opt.reorder = false;
+% opt.extra   = true;
+% niak_schemaball(Data,Mask,opt)
+
 function schemaball(Data,Mask,varargin)
 
-% FORMAT schemaball(Data,Names,'Threshold',x,'Reorder','Yes',ExtraPlots,'Yes'))
+% FORMAT schemaball( Data , Mask , [Names,'Threshold',x,'Reorder','Yes',ExtraPlots,'Yes'] )
 % 
 % IMPUT Data is a 2D n*n symmetric correlation matrix
-%       Mask is a 2D n*n symetric binary correlation matrix
-%       OPTIONS ARE
+%       Mask is a 2D n*n binary matrix. 1s indicate which connections to plot.
+%   OPTIONS ARE
 %       Names      cell array with n names (default 1 to n)
 %       Edges      'Bezier' (default) or 'Line' for curved or straight lines between nodes 
-%       Connect    'Thickness' or 'Colour' edges changfe thickness or color based on the Data values
+%       Connect    'Thickness' or 'Colour' edges change thickness or color based on the Data values
 %       Reorder    reorder data to minimize edge crossing (bandwidth)
 %       ExtraPlots in addition to the circular plot, other plots to visualize the data are provided
 % 
 % Example 
-% Names{1} = 'Left ROI1'
-% Names{2} = 'Left ROI2'
-% Names{3} = 'Left ROI3'
-% Names{4} = 'Left ROI4'
-% Names{5} = 'Right ROI1'
-% Names{6} = 'Right ROI2'
-% Names{7} = 'Right ROI3'
-% Names{8} = 'Right ROI4'
+% Names = { 'Left ROI1'  , 'Left ROI2'  , 'Left ROI3'  , 'Left ROI4' , ...
+%           'Right ROI1' , 'Right ROI2' , 'Right ROI3' , 'Right ROI4' };
 % Data = zeros(8,8); Data(find(eye(8))) = 1;
 % Data(1,5) = 0.9; Data(2,6) = 0.8; Data(3,7) = 0.9; % interhemispheric +connections
 % Data(1,2) = 0.6; Data(1,3) = 0.6; Data(1,4) = 0.5 % connection ROI1 to others
@@ -247,11 +272,3 @@ set(gca, 'Xtick',[],'Ytick',[],'Color','w')
 axis([-1 1 -1 1]);
 axis equal
 axis off
-
-
-
-
-
-
-
-
