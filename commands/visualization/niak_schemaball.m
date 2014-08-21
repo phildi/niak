@@ -134,7 +134,7 @@ narginchk(2,12)
 for arg = 1:2:7
     if strcmp(varargin(arg),'Names')
         clear Names; 
-        for n=1:size(varargin{arg+1},2)
+        for n=1:length(varargin{arg+1})
             Names{n} = varargin{arg+1}{n};
         end
     end
@@ -179,8 +179,8 @@ else
     N = a; clear a b
 end
 
-if size(Data) ~= size(Mask)
-    error('The correrlation and binary matrices must be of same size')
+if any(size(Data) ~= size(Mask))
+    error('The correlation and binary matrices must be of same size')
 end
 
 if length(Names) ~= N
@@ -315,7 +315,7 @@ elseif strcmp(flag.Edges, 'Bezier');
         By(:,c) = t2*[xy(ind1(c),2); xy(ind2(c),2)];
     end
     
-    % plot but check the correlation strengh in Data2 to choose color order
+    % plot but check the correlation strengh in Data2 to choose color order    
     for c = 1:N2
         if strcmp(flag.Connect,'Thickness')
             plot(Bx(:,c),By(:,c),'b','LineWidth',T(plotindex));
