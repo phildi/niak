@@ -21,7 +21,7 @@ function [] = niak_visu_part(part,opt)
 %
 %       TYPE_MAP
 %           (string, default 'jet') the colormap used to display the clusters 
-%           (options: 'boxjet', 'jet' or 'hotcold' or 'none').
+%           (options: 'jet', 'hotcold' or 'none').
 %           If map is 'none', the current colormap is used.
 %           'jet': same as matlab's jet, except that zero is mapped to white.
 %
