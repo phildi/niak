@@ -86,7 +86,11 @@ else
     extra = 'No';
 end
 
-sub_schemaball(data,mask,'Names',opt.names,'Edges',opt.edges,'Connect',opt.connect,'Reorder',reorder,'ExtraPlots',extra);
+if isempty(opt.names)
+    sub_schemaball(data,mask,'Edges',opt.edges,'Connect',opt.connect,'Reorder',reorder,'ExtraPlots',extra);
+else
+    sub_schemaball(data,mask,'Names',opt.names,'Edges',opt.edges,'Connect',opt.connect,'Reorder',reorder,'ExtraPlots',extra);
+end
 
 function sub_schemaball(Data,Mask,varargin)
 
