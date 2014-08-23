@@ -18,7 +18,7 @@ function [in,out,opt] = niak_brick_table_clusters(in,out,opt)
 %   IN.LABELS_REF (string, necessary if REF is not the default, otherwise 
 %      uses the AAL labels) same as LABELS_PART, but for REF.
 %
-% OUT (string) a .csv with a sumary table. Each row corresponds to a cluster:
+%   OUT (string) a .csv with a sumary table. Each row corresponds to a cluster:
 %      column 1: string label (in IN.LABELS_PART)
 %      column 2: numerical label (in IN.PART)
 %      column 3: the volume (in mm3)
@@ -32,29 +32,25 @@ function [in,out,opt] = niak_brick_table_clusters(in,out,opt)
 %      cluster with highest overlap, third-most reference cluster, etc. 
 %      The max number of clusters can be set in OPT
 %
-% OPT.NB_REF (integer, default 5) the max number of reference clusters being listed. 
-% OPT.FLAG_VERBOSE (boolean, default 1) if the flag is 1, then the function prints 
-%   some infos during the processing.
-% OPT.FLAG_TEST (boolean, default 0) if FLAG_TEST equals 1, the brick does not do 
-%   anything but update the default values in IN, OUT and OPT.
+%    OPT.NB_REF (integer, default 5) the max number of reference clusters being listed. 
+%    OPT.FLAG_VERBOSE (boolean, default 1) if the flag is 1, then the function prints 
+%       some infos during the processing.
+%    OPT.FLAG_TEST (boolean, default 0) if FLAG_TEST equals 1, the brick does not do 
+%       anything but update the default values in IN, OUT and OPT.
 %           
-% _________________________________________________________________________
 % OUTPUTS:
-%
-% IN, OUT, OPT: same as inputs but updated with default values.
+%   IN, OUT, OPT: same as inputs but updated with default values.
 %              
-% _________________________________________________________________________
 % COMMENTS:
-%
-% The target and reference partitions need to be in the same space, and sampled
-% on the same grid !
+%   The target and reference partitions need to be in the same space, and sampled
+%   on the same grid !
 % 
-% An example of a label file would look like:
-% Precentral_L  , 2001
-% Precentral_R  , 2002
-% Frontal_Sup_L , 2101
-% etc 
-% _________________________________________________________________________
+%    An example of a label file would look like:
+%    Precentral_L  , 2001
+%    Precentral_R  , 2002
+%    Frontal_Sup_L , 2101
+%    etc 
+%
 % Copyright (c) Pierre Bellec
 % Centre de recherche de l'institut de gériatrie de Montréal, 
 % Department of Computer Science and Operations Research
@@ -83,7 +79,6 @@ function [in,out,opt] = niak_brick_table_clusters(in,out,opt)
 
 
 %% Initialization and syntax checks
-flag_gb_niak_fast_gb = true; % Only load the most important global variables for fast initialization
 niak_gb_vars 
 
 %% Syntax
@@ -128,10 +123,18 @@ end
 
 %% Read the target partition
 [hdr,part] = niak_read_vol(in.part);
-labels_part = niak_read_csv_cell(in.labels_part);
 ind_part = unique(part(:));
 ind_part = ind_part(ind_part~=0);
 nb_part = length(ind_part);
+if ~isempty(in.labels_part)
+    labels_part = niak_read_csv_cell(in.labels_part);
+else
+    labels_part = cell(nb_part,1);
+    for pp = 1:nb_part
+        labels_part{pp} = sprintf('Cluster_%i',ind_part(pp));
+    end
+end
+
 if size(labels_part,2)>1
     [val,s_idx] = ismember(ind_part,labels_part(:,2));
     if any(~val)
@@ -148,14 +151,55 @@ end
 ind_ref = unique(ref(:));
 ind_ref = ind_ref(ind_ref~=0);
 nb_ref = length(ind_ref);
+labels_ref = niak_read_csv_cell(in.labels_ref);
 if size(labels_ref,2)>1
-    [val,s_idx] = ismember(ind_ref,labels_ref(:,2));
+    [val,s_idx] = ismember(ind_ref,cell2mat(labels_ref(:,2)));
     if any(~val)
         error('Some numerical labels in IN.PART could not be found in the second column of IN.LABELS_PART')
     end
     labels_ref = labels_ref(s_idx,1);
 end
 
-%% now make the table
+%% Header for the table
 tab = cell(nb_part+1,3+3*opt.nb_ref);
+tab(1,1:3) = { 'label' , 'numerical_id' , 'volume (mm3)' };
+for rr = 1:opt.nb_ref
+    tab(1,4+(rr-1)*3:6+(rr-1)*3) = { sprintf('#%i reference',rr) , 'overlap target in ref' , 'overlap ref in target' };
+end
+
+%% now make the table
+for pp = 1:nb_part
+    tab(pp+1,1) = labels_part(pp);
+    tab{pp+1,2} = ind_part(pp);
+    tab{pp+1,3} = sum(part(:)==ind_part(pp)) * prod(hdr.info.voxel_size);
+    %% Now look for reference regions overlapping with the target
+    ind_ovlp = unique(ref(part(:)==ind_part(pp)));
+    ind_ovlp = ind_ovlp(ind_ovlp~=0);
+    ind_ovlp = [ ind_ovlp(1:min(length(ind_ovlp),opt.nb_ref)) ; zeros([opt.nb_ref-length(ind_ovlp) 1]) ];
+    labels_oo = cell(opt.nb_ref,1);
+    perc_oo2pp = zeros(opt.nb_ref,1);
+    perc_pp2oo = zeros(opt.nb_ref,1);
+    for oo = 1:length(ind_ovlp)
+        if ind_ovlp(oo)~=0
+            labels_oo{oo}  = labels_ref{ind_ref==ind_ovlp(oo)};
+            perc_oo2pp(oo) = sum(ref(part(:)==ind_part(pp))==ind_ovlp(oo)) / sum(ref(:)==ind_ovlp(oo));
+            perc_pp2oo(oo) = sum(ref(part(:)==ind_part(pp))==ind_ovlp(oo)) / sum(part(:)==ind_part(pp));
+        else
+            labels_oo{oo}  = 'NA';
+            perc_oo2pp(oo) = 0;
+            perc_pp2oo(oo) = 0;
+        end
+    end
+    [val,order] = sort(perc_pp2oo,'descend');
+    labels_oo = labels_oo(order);
+    perc_oo2pp = perc_oo2pp(order);
+    perc_pp2oo = perc_pp2oo(order);
+    for oo = 1:opt.nb_ref
+        tab(pp+1,4+(oo-1)*3:6+(oo-1)*3) = { labels_oo{oo} , perc_pp2oo(oo) , perc_oo2pp(oo) };
+    end
+end
+
+%% Write the table
+niak_write_csv_cell(out,tab);
+
 
