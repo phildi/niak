@@ -9,6 +9,7 @@ function [pipe,opt,status] = niak_test_all(path_test,opt)
 %
 % PATH_TEST.DEMONIAK (string, default download minc1 test data in 'test_niak_mnc1') 
 %   the path to the (raw, small) NIAK demo dataset.
+% PATH_TEST.TEMPLATE (string, default download the mnc cambridge template from figshare)
 % PATH_TEST.TARGET (string, default download minc1 target data in 'target') 
 % PATH_TEST.RESULT (string, default 'result') where to store the results of 
 %   the tests.
@@ -63,8 +64,8 @@ function [pipe,opt,status] = niak_test_all(path_test,opt)
 % http://code.google.com/p/psom/wiki/PsomConfiguration
 %
 % Copyright (c) Pierre Bellec, Centre de recherche de l'institut de 
-% Gériatrie de Montréal, Département d'informatique et de recherche 
-% opérationnelle, Université de Montréal, 2013-2014.
+% Geriatrie de Montreal, Departement d'informatique et de recherche 
+% oprationnelle, Universite de Montreal, 2013-2014.
 % Maintainer : pierre.bellec@criugm.qc.ca
 % See licensing information in the code.
 % Keywords : test, NIAK, fMRI preprocessing, pipeline, DEMONIAK
@@ -104,52 +105,40 @@ if nargin < 1
     path_test = struct();
 end
 path_test = psom_struct_defaults(path_test, ...
-    { 'target' , 'demoniak' , 'result'}, ...
-    { ''       , ''         , ''      });
-    
+    { 'target' , 'template' , 'demoniak' , 'result'}, ...
+    { ''       , ''         , ''          , ''     });
+
+%% Check the demoniak data
 if isempty(path_test.demoniak)
-    path_test.demoniak = [pwd filesep 'data_test_niak_mnc1' filesep];
-    if ~psom_exist(path_test.demoniak)
-        psom_clean('data_test_niak_mnc1.zip')
-        if exist('gb_niak_url_test_niak','var')&&~isempty(gb_niak_url_test_niak)
-            [status,msg] = system(['wget ' gb_niak_url_test_niak]);
-            if status
-                error('There was a problem downloading the test data: %s',msg)
-            end
-        else
-            error('Automatic download of the test data is not supported for this version of NIAK')
-        end
-        [status,msg] = system('unzip data_test_niak_mnc1.zip');
-        psom_clean('data_test_niak_mnc1.zip')
-        if status
-            error('There was a problem unzipping the test data: %s',msg)
-        end
+    % Grab the demoniak dataset    
+    [status,err,data_demoniak] = niak_wget(struct('type','data_test_niak_mnc1'));
+    path_test.demoniak = data_demoniak.path;
+    if status
+        error('There was a problem downloading the test data');
+    end
+else
+    fprintf('I am going to use the demoniak data at %s', path_test.demoniak);
+end
+
+%% Grab the demoniak dataset    
+if ~opt.flag_target&&isempty(path_test.target)
+    [status,err,data_target] = niak_wget(struct('type','target_test_niak_mnc1'));
+    path_test.target = data_target.path;
+    if status
+        error('There was a problem downloading the target data')
     end
 end
 
-if isempty(path_test.target)&&~opt.flag_target
-    name_target = ['target_test_niak_mnc1-' gb_niak_version];
-    path_test.target = [pwd filesep name_target filesep];
-    if ~psom_exist(path_test.target)
-        psom_clean([name_target '.zip'])
-        if exist('gb_niak_url_target_niak','var')&&~isempty(gb_niak_url_target_niak)
-            [status,msg] = system(['wget ' gb_niak_url_target_niak]);
-            if status
-                error('There was a problem downloading the target data: %s',msg)
-            end
-        else
-            warning('Automatic download of the test data is not supported for this version of NIAK. I am forcing the generation of a target, without further testing.'
-    )
-            opt.flag_target = true;
-        end
-        if ~opt.flag_target
-            [status,msg] = system(['unzip ' name_target '.zip']);
-            psom_clean([name_target '.zip'])
-            if status
-                error('There was a problem unzipping the target data: %s',msg)
-            end
-        end
+%% Check the template data
+if isempty(path_test.template)
+    % Grab the cambridge template
+    [status,err,data_demoniak] = niak_wget(struct('type','cambridge_template_mnc'));
+    path_test.template = data_demoniak.path;
+    if status
+        error('There was a problem downloading the template data');
     end
+else
+    fprintf('I am going to use the template data at %s', path_test.demoniak);
 end
 
 if isempty(path_test.result)
@@ -205,11 +194,11 @@ path_logs = [path_test.result 'demoniak_region_growing' filesep 'logs'];
 pipe.demoniak_region_growing = psom_pipeline2job(niak_test_region_growing_demoniak(path_test_rg,opt_pipe),path_logs);
 
 %% Add the test of the connectome pipeline
-path_test_rg.demoniak  = 'gb_niak_omitted'; % The input files are fed directly through opt_pipe.files_in above
-path_test_rg.reference = [path_test.target 'demoniak_connectome'];
-path_test_rg.result    = path_test.result;
+path_test_con.demoniak  = 'gb_niak_omitted'; % The input files are fed directly through opt_pipe.files_in above
+path_test_con.reference = [path_test.target 'demoniak_connectome'];
+path_test_con.result    = path_test.result;
 path_logs = [path_test.result 'demoniak_connectome' filesep 'logs'];
-pipe.demoniak_connectome = psom_pipeline2job(niak_test_connectome_demoniak(path_test_rg,opt_pipe),path_logs);
+pipe.demoniak_connectome = psom_pipeline2job(niak_test_connectome_demoniak(path_test_con,opt_pipe),path_logs);
 
 %% Add the test of the stability_fir pipeline
 path_test_fir.demoniak  = 'gb_niak_omitted'; % The input files are fed directly through opt_pipe.files_in above
@@ -238,6 +227,27 @@ path_test_fir.reference = [path_test.target 'demoniak_glm_connectome'];
 path_test_fir.result    = path_test.result;
 path_logs = [path_test.result 'demoniak_glm_connectome' filesep 'logs'];
 pipe.demoniak_glm_connectome = psom_pipeline2job(niak_test_glm_connectome_demoniak(path_test_fir,opt_pipe),path_logs);
+
+%% Add the test of the scores pipeline
+if opt.flag_target
+    % In target mode, grab the results of the preprocessing and use them for scores
+    files_all = niak_grab_all_preprocess([path_test_fp.result 'demoniak_preproc'],files_fp);
+else
+    % In test mode, use the provided target to feed into the scores pipeline
+    files_all = niak_grab_all_preprocess([path_test.target 'demoniak_preproc'],files_fp);
+end
+opt_scores = struct;
+opt_scores.flag_test = true;
+opt_scores.flag_target = opt.flag_target;
+files_sc.data  = files_all.fmri.vol;
+files_sc.mask  = files_all.quality_control.group_coregistration.func.mask_group;
+files_sc.part = [path_test.template filesep 'template_cambridge_basc_multiscale_sym_scale007.mnc.gz'];
+opt_scores.files_in = files_sc;
+path_test_sc.demoniak  = 'gb_niak_omitted'; % The input files are fed directly through opt_pipe.files_in above
+path_test_sc.reference = [path_test.target 'demoniak_scores'];
+path_test_sc.result    = path_test.result;
+path_logs = [path_test.result 'demoniak_scores' filesep 'logs'];
+pipe.demoniak_scores = psom_pipeline2job(niak_test_scores_demoniak(path_test_sc,opt_scores),path_logs);
 
 %% Add the unit tests for GLM-connectome
 path_test = [path_test.result 'glm_connectome_unit'];

@@ -11,7 +11,13 @@ install:
   - sudo apt-get install build-essential g++ cmake cmake-curses-gui bison flex freeglut3 freeglut3-dev libxi6 libxi-dev libxmu6 libxmu-dev libxmu-headers imagemagick libjpeg62 -y
   # Install octave dependecies
   - sudo apt-get  install "liboctave-dev" -y
-  - sudo octave --eval "pkg install -auto -global -forge control general signal image io statistics"
+  - sudo wget http://sourceforge.net/projects/octave/files/Octave%20Forge%20Packages/Individual%20Package%20Releases/control-2.8.0.tar.gz -P /home/octave
+  - sudo wget http://sourceforge.net/projects/octave/files/Octave%20Forge%20Packages/Individual%20Package%20Releases/general-1.3.4.tar.gz -P /home/octave
+  - sudo wget http://sourceforge.net/projects/octave/files/Octave%20Forge%20Packages/Individual%20Package%20Releases/signal-1.3.0.tar.gz -P /home/octave
+  - sudo wget http://sourceforge.net/projects/octave/files/Octave%20Forge%20Packages/Individual%20Package%20Releases/image-2.2.2.tar.gz -P /home/octave
+  - sudo wget http://sourceforge.net/projects/octave/files/Octave%20Forge%20Packages/Individual%20Package%20Releases/io-2.0.2.tar.gz -P /home/octave
+  - sudo wget http://sourceforge.net/projects/octave/files/Octave%20Forge%20Packages/Individual%20Package%20Releases/statistics-1.2.4.tar.gz -P /home/octave
+  - sudo octave --eval "cd /home/octave; more off; pkg install -auto -global -verbose control-2.8.0.tar.gz general-1.3.4.tar.gz signal-1.3.0.tar.gz image-2.2.2.tar.gz io-2.0.2.tar.gz statistics-1.2.4.tar.gz"
   # Get the minc toolkit
   - wget http://packages.bic.mni.mcgill.ca/minc-toolkit/Debian/minc-toolkit-1.9.2-20140730-Ubuntu_14.04-x86_64.deb -P /home/travis
   # Install the minc toolkit
@@ -37,7 +43,8 @@ before_script:
   - source /opt/minc-itk4/minc-toolkit-config.sh
 
 script:
-  - octave --eval "[pipe,opt,status] = niak_test_all(struct(),struct('psom',struct('mode','background','max_queued',2,'flag_pause',false))); system('cat result/report_test_regression_fmripreproc_demoniak.csv'), exit(status)"
+  - octave --eval "[pipe,opt,status] = niak_test_all(struct(),struct('psom',struct('mode_pipeline_manager','session','mode','background','max_queued',2,'flag_pause',false))); system('cat result/report_test_regression_fmripreproc_demoniak.csv'), exit(status)"
 
 notifications:
   email: false
+  slack: simexp:eFh4jwo2RWWvSoafeVx9xzoU
