@@ -20,6 +20,10 @@ function csv_cell = niak_read_csv_cell(file_name,opt)
 %   FLAG_STRING
 %       (boolean, default true) remove the ' and " characters in strings.
 %
+%   FLAG_DOUBLE
+%       (boolean, defaut true) attempt to convert numerical values into 
+%       double format, instead of character arrays. 
+%
 %   FLAG_TRIM
 %       (boolean, default true) trim leading and trailing spaces in labels.
 %
@@ -68,13 +72,12 @@ if ~exist(file_name,'file')
 end
 
 %% Options
-
-list_fields   = {'separator' , 'flag_trim' , 'flag_string' };
-list_defaults = {','         , true        , true          };
 if nargin == 1
     opt = struct();
 end
-opt = psom_struct_defaults(opt,list_fields,list_defaults);
+opt = psom_struct_defaults( opt, ...
+      {'separator' , 'flag_trim' , 'flag_double' , 'flag_string' } , ...
+      {','         , true        , true          , true          });
 
 %% Reading the table
 hf = fopen(file_name);
@@ -98,6 +101,13 @@ for num_r = 1:length(cell_tab)
 end
 if opt.flag_trim
     csv_cell = strtrim(csv_cell);
+end
+
+if opt.flag_double
+    tab = str2double(csv_cell);
+    mask = ~isnan(tab);
+    tab = num2cell(tab);
+    csv_cell(mask) = tab(mask);
 end
 
 function cell_values = sub_csv(str_values,separator)
